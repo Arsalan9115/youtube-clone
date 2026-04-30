@@ -56,14 +56,14 @@ export const UserProvider = ({ children }) => {
   };
   const sendOtp = async (payload) => {
     try {
-      const response = await axiosInstance.post("/send-otp", payload);
+      const response = await axiosInstance.post("/user/send-otp", payload);
       return response.data;
     } catch (error) {
       throw error;
     }
   };
   const verifyOtp = async (email, otp) => {
-    const response = await axiosInstance.post("/verify-otp", { email, otp });
+    const response = await axiosInstance.post("/user/verify-otp", { email, otp });
     login(response.data.result);
     return response.data.result;
   };
