@@ -22,7 +22,7 @@ export const sendOtpSms = async ({ mobileNumber, otp }) => {
 
   const body = new URLSearchParams({
     Body: `YourTube OTP: ${otp}. It expires in 10 minutes.`,
-    From: process.env.TWILIO_FROM_NUMBER,
+    From: process.env.TWILIO_PHONE_NUMBER,
     To: mobileNumber,
   });
 
