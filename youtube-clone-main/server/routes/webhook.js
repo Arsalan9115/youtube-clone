@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import User from '../models/User.js'; // path check kar lena
+import User from '../models/user.js'; // path check kar lena
 
 const router = express.Router();
 
