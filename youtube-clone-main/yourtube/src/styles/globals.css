@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* 1. Light Theme (Default) */
+:root, .light {
+  --background: #ffffff;
+  --foreground: #0f0f0f;
+  --card: #ffffff;
+  --card-foreground: #0f0f0f;
+  --popover: #ffffff;
+  --popover-foreground: #0f0f0f;
+  --primary: #0f0f0f;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #0f0f0f;
+  --muted: #f2f2f2;
+  --muted-foreground: #606060;
+  --accent: #f2f2f2;
+  --accent-foreground: #0f0f0f;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f0f0f;
+}
+
+/* 2. Dark Theme (When .dark class is added to html/body) */
+.dark {
+  --background: #0f0f0f !important;
+  --foreground: #ffffff !important;
+  --card: #181818 !important;
+  --card-foreground: #ffffff !important;
+  --popover: #181818 !important;
+  --popover-foreground: #ffffff !important;
+  --primary: #ffffff !important;
+  --primary-foreground: #0f0f0f !important;
+  --secondary: #272727 !important;
+  --secondary-foreground: #ffffff !important;
+  --muted: #272727 !important;
+  --muted-foreground: #aaaaaa !important;
+  --accent: #272727 !important;
+  --accent-foreground: #ffffff !important;
+  --border: rgba(255, 255, 255, 0.1) !important;
+  --input: rgba(255, 255, 255, 0.15) !important;
+  --sidebar: #0f0f0f !important;
+  --sidebar-foreground: #ffffff !important;
+}
+
+/* 3. Direct Element Styling */
+html, body {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, Helvetica, sans-serif;
+}
