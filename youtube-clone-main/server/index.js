@@ -11,6 +11,7 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY, 
   api_secret: process.env.CLOUDINARY_API_SECRET 
 });
+
 import userroutes from "./routes/auth.js";
 import videoroutes from "./routes/video.js";
 import likeroutes from "./routes/like.js";
@@ -24,7 +25,14 @@ import webhookroutes from "./routes/webhook.js";
 
 const app = express();
 
-app.use(cors({ exposedHeaders: ["X-App-Theme"] }));
+// ✅ Fixed CORS Configuration for Production
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-App-Theme'],
+  exposedHeaders: ['X-App-Theme']
+}));
+
 app.use("/webhook", express.raw({type: "application/json"}));
 app.use(express.json({ limit: "30mb", extended: true }));
 app.use(express.urlencoded({ limit: "30mb", extended: true }));
