@@ -25,12 +25,13 @@ import webhookroutes from "./routes/webhook.js";
 
 const app = express();
 
-// ✅ Fixed CORS Configuration for Production
+// ✅ Fixed CORS for Mobile + Vercel
 app.use(cors({
-  origin: '*',
+  origin: "https://youtube-clone-a12w.vercel.app",
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-App-Theme'],
-  exposedHeaders: ['X-App-Theme']
+  exposedHeaders: ['X-App-Theme'],
+  credentials: true
 }));
 
 app.use("/webhook", express.raw({type: "application/json"}));
@@ -42,6 +43,7 @@ app.use(regionMiddleware);
 app.get("/", (req, res) => {
   res.send("YouTube backend is working");
 });
+
 app.get("/user/region", (req, res) => res.json({
   city: req.location?.city || "",
   state: req.location?.region || "",
