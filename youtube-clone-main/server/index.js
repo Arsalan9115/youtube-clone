@@ -29,6 +29,7 @@ const app = express();
 const allowedOrigins = [
   "https://youtube-clone-a12w.vercel.app",
   "https://youtube-clone-a12w-a63tlsujs-arsalan9115s-projects.vercel.app",
+  "https://youtube-clone-a12w-git-master-arsalan9115s-projects.vercel.app", // <-- NAYA URL ADD KIYA
   "http://localhost:5173",
   "http://localhost:3000"
 ]
@@ -40,6 +41,7 @@ app.use(cors({
     if(allowedOrigins.includes(origin)) {
       return callback(null, true)
     } else {
+      console.log("Blocked by CORS:", origin) // debug ke liye
       return callback(new Error('Not allowed by CORS: ' + origin))
     }
   },
