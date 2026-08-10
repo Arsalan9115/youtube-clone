@@ -14,7 +14,7 @@ const hashOtp = (otp) => crypto.createHash("sha256").update(otp).digest("hex");
 const createToken = (userId) => jwt.sign({ userId: String(userId) }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 // =======================================================
-// 1. DYNAMIC REGIONAL THEME API (SYNCED WITH CLIENT TIME)
+// 1. DYNAMIC REGIONAL THEME API
 // =======================================================
 export const getRegionTheme = async (req, res) => {
   try {
@@ -42,7 +42,7 @@ export const getRegionTheme = async (req, res) => {
 };
 
 // =======================================================
-// 2. USER LOGIN / SYNCHRONIZATION
+// 2. USER LOGIN
 // =======================================================
 export const login = async (req, res) => {
   const { city, email, name, image, mobileNumber, state } = req.body;
@@ -76,7 +76,7 @@ export const login = async (req, res) => {
 };
 
 // =======================================================
-// 3. SEND OTP (SAFE MOBILE FORMAT + ISOLATED TRY-CATCH)
+// 3. SEND OTP (ORIGINAL LOGIC RESTORED)
 // =======================================================
 export const sendLoginOtp = async (req, res) => {
   let { email, mobileNumber, name } = req.body;
@@ -89,14 +89,9 @@ export const sendLoginOtp = async (req, res) => {
     });
   }
 
-  // ✅ SANITIZE MOBILE NUMBER (PREVENTS DOUBLE +91 / FORMAT ERRORS)
-  let cleanDigits = mobileNumber.toString().replace(/\D/g, '');
-  if (cleanDigits.length === 12 && cleanDigits.startsWith('91')) {
-    mobileNumber = `+${cleanDigits}`;
-  } else if (cleanDigits.length === 10) {
-    mobileNumber = `+91${cleanDigits}`;
-  } else {
-    mobileNumber = `+${cleanDigits}`;
+  // Safe check for leading '+' (agar user bina +91 ke dale toh bas tabhi lagao)
+  if (mobileNumber && !mobileNumber.trim().startsWith("+")) {
+    mobileNumber = `+91${mobileNumber.trim()}`;
   }
 
   const otp = buildOtp();
@@ -105,7 +100,7 @@ export const sendLoginOtp = async (req, res) => {
   const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
   try {
-    let deliveryResult = {};
+    let deliveryResult;
 
     const user = await users.findOneAndUpdate(
       { email },
@@ -125,16 +120,25 @@ export const sendLoginOtp = async (req, res) => {
     );
 
     if (otpChannel === "email") {
-      try {
-        deliveryResult = await sendOtpEmail({ email, name, otp, state });
-      } catch (emailErr) {
-        console.error("Email Delivery Exception:", emailErr.message);
+      const emailResult = await sendOtpEmail({ email, name, otp, state });
+      deliveryResult = emailResult;
+
+      if (emailResult.skipped) {
+        return res.status(503).json({
+          message:
+            "Email OTP is not configured yet. Add SMTP credentials to enable this flow.",
+        });
       }
     } else {
-      try {
-        deliveryResult = await sendOtpSms({ mobileNumber, otp });
-      } catch (smsErr) {
-        console.error("SMS Delivery Exception:", smsErr.message);
+      const smsResult = await sendOtpSms({ mobileNumber, otp });
+      deliveryResult = smsResult;
+
+      if (smsResult.skipped) {
+        return res.status(503).json({
+          debugOtp: process.env.OTP_DEBUG_MODE === "true" ? otp : undefined,
+          message:
+            "Mobile OTP is not configured yet. Add Twilio credentials to enable SMS delivery.",
+        });
       }
     }
 
