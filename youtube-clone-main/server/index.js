@@ -25,9 +25,24 @@ import webhookroutes from "./routes/webhook.js";
 
 const app = express();
 
-// ✅ Fixed CORS for Mobile + Vercel
+// ✅ Fixed CORS for All Vercel Domains + Local
+const allowedOrigins = [
+  "https://youtube-clone-a12w.vercel.app",
+  "https://youtube-clone-a12w-a63tlsujs-arsalan9115s-projects.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000"
+]
+
 app.use(cors({
-  origin: "https://youtube-clone-a12w.vercel.app",
+  origin: function (origin, callback) {
+    // mobile app ya postman ke liye origin nahi hota
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    } else {
+      return callback(new Error('Not allowed by CORS: ' + origin))
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-App-Theme'],
   exposedHeaders: ['X-App-Theme'],
