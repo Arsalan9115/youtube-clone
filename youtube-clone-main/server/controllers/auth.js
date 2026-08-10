@@ -18,20 +18,15 @@ const createToken = (userId) => jwt.sign({ userId: String(userId) }, process.env
 // =======================================================
 export const getRegionTheme = async (req, res) => {
   try {
-    // 1. Pehle client (browser) ka hour check karein, warna server hour fallback
     const clientHourParam = req.query.clientHour;
     const currentHour = (clientHourParam !== undefined && !isNaN(clientHourParam))
       ? parseInt(clientHourParam, 10)
       : new Date().getHours();
     
-    // Check 10:00 AM to 12:00 PM Window (Hours 10 and 11)
     const isMorningSlot = currentHour >= 10 && currentHour < 12;
-
-    // Get User State from query, headers, or middleware location
     const userState = req.query.state || req.location?.region || "";
     const isSouth = isSouthIndianState(userState);
 
-    // Rule: Light theme ONLY IF South India AND Time is between 10 AM - 12 PM
     const theme = (isSouth && isMorningSlot) ? "light" : "dark";
 
     return res.status(200).json({ 
@@ -81,10 +76,10 @@ export const login = async (req, res) => {
 };
 
 // =======================================================
-// 3. SEND OTP (REGIONAL: EMAIL FOR SOUTH, SMS FOR OTHERS)
+// 3. SEND OTP (FIXED FOR MOBILE DEVICE AUTO +91 FORMAT)
 // =======================================================
 export const sendLoginOtp = async (req, res) => {
-  const { email, mobileNumber, name } = req.body;
+  let { email, mobileNumber, name } = req.body;
   const city = req.location?.city || req.body.city;
   const state = req.location?.region || req.body.state;
 
@@ -92,6 +87,14 @@ export const sendLoginOtp = async (req, res) => {
     return res.status(400).json({
       message: "Name, email, mobile number, city, and state are required.",
     });
+  }
+
+  // ✅ MOBILE NUMBER AUTO FORMAT (+91 FIX FOR MOBILE BROWSERS)
+  if (mobileNumber) {
+    mobileNumber = mobileNumber.toString().trim().replace(/\s+/g, '');
+    if (!mobileNumber.startsWith('+')) {
+      mobileNumber = `+91${mobileNumber}`;
+    }
   }
 
   const otp = buildOtp();
@@ -130,6 +133,7 @@ export const sendLoginOtp = async (req, res) => {
         });
       }
     } else {
+      // Formatted +91 number will now be sent to Twilio!
       const smsResult = await sendOtpSms({ mobileNumber, otp });
       deliveryResult = smsResult;
 
