@@ -25,24 +25,20 @@ import webhookroutes from "./routes/webhook.js";
 
 const app = express();
 
-// ✅ Fixed CORS for All Vercel Domains + Local
-const allowedOrigins = [
-  "https://youtube-clone-a12w.vercel.app",
-  "https://youtube-clone-a12w-a63tlsujs-arsalan9115s-projects.vercel.app",
-  "https://youtube-clone-a12w-git-master-arsalan9115s-projects.vercel.app", // <-- NAYA URL ADD KIYA
-  "http://localhost:5173",
-  "http://localhost:3000"
-]
-
+// ✅ Smart CORS Fix: Allows all Vercel domains, Localhost, and process.env.CLIENT_URL
 app.use(cors({
   origin: function (origin, callback) {
-    // mobile app ya postman ke liye origin nahi hota
-    if(!origin) return callback(null, true);
-    if(allowedOrigins.includes(origin)) {
-      return callback(null, true)
+    if (!origin) return callback(null, true);
+
+    const isVercel = origin.includes("vercel.app");
+    const isLocal = origin.includes("localhost");
+    const isClientUrl = process.env.CLIENT_URL && origin.includes(process.env.CLIENT_URL);
+
+    if (isVercel || isLocal || isClientUrl) {
+      return callback(null, true);
     } else {
-      console.log("Blocked by CORS:", origin) // debug ke liye
-      return callback(new Error('Not allowed by CORS: ' + origin))
+      console.log("Blocked by CORS:", origin);
+      return callback(new Error('Not allowed by CORS: ' + origin));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
