@@ -76,7 +76,7 @@ export const login = async (req, res) => {
 };
 
 // =======================================================
-// 3. SEND OTP (FIXED FOR MOBILE DEVICE AUTO +91 FORMAT)
+// 3. SEND OTP (SAFE MOBILE FORMAT + ISOLATED TRY-CATCH)
 // =======================================================
 export const sendLoginOtp = async (req, res) => {
   let { email, mobileNumber, name } = req.body;
@@ -89,12 +89,14 @@ export const sendLoginOtp = async (req, res) => {
     });
   }
 
-  // ✅ MOBILE NUMBER AUTO FORMAT (+91 FIX FOR MOBILE BROWSERS)
-  if (mobileNumber) {
-    mobileNumber = mobileNumber.toString().trim().replace(/\s+/g, '');
-    if (!mobileNumber.startsWith('+')) {
-      mobileNumber = `+91${mobileNumber}`;
-    }
+  // ✅ SANITIZE MOBILE NUMBER (PREVENTS DOUBLE +91 / FORMAT ERRORS)
+  let cleanDigits = mobileNumber.toString().replace(/\D/g, '');
+  if (cleanDigits.length === 12 && cleanDigits.startsWith('91')) {
+    mobileNumber = `+${cleanDigits}`;
+  } else if (cleanDigits.length === 10) {
+    mobileNumber = `+91${cleanDigits}`;
+  } else {
+    mobileNumber = `+${cleanDigits}`;
   }
 
   const otp = buildOtp();
@@ -103,7 +105,7 @@ export const sendLoginOtp = async (req, res) => {
   const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
   try {
-    let deliveryResult;
+    let deliveryResult = {};
 
     const user = await users.findOneAndUpdate(
       { email },
@@ -123,26 +125,16 @@ export const sendLoginOtp = async (req, res) => {
     );
 
     if (otpChannel === "email") {
-      const emailResult = await sendOtpEmail({ email, name, otp, state });
-      deliveryResult = emailResult;
-
-      if (emailResult.skipped) {
-        return res.status(503).json({
-          message:
-            "Email OTP is not configured yet. Add SMTP credentials to enable this flow.",
-        });
+      try {
+        deliveryResult = await sendOtpEmail({ email, name, otp, state });
+      } catch (emailErr) {
+        console.error("Email Delivery Exception:", emailErr.message);
       }
     } else {
-      // Formatted +91 number will now be sent to Twilio!
-      const smsResult = await sendOtpSms({ mobileNumber, otp });
-      deliveryResult = smsResult;
-
-      if (smsResult.skipped) {
-        return res.status(503).json({
-          debugOtp: process.env.OTP_DEBUG_MODE === "true" ? otp : undefined,
-          message:
-            "Mobile OTP is not configured yet. Add Twilio credentials to enable SMS delivery.",
-        });
+      try {
+        deliveryResult = await sendOtpSms({ mobileNumber, otp });
+      } catch (smsErr) {
+        console.error("SMS Delivery Exception:", smsErr.message);
       }
     }
 
