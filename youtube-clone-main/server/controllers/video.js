@@ -25,7 +25,9 @@ export const uploadvideo = async (req, res) => {
     let duration = 0;
     let thumbnailUrl = "";
 
-    // ⚡ CLOUDINARY UPLOAD (If Configured in Render Env)
+    // Store production uploads in Cloudinary. Render's local filesystem is
+    // ephemeral, so saving a /uploads URL in production creates broken videos
+    // after the next deploy or service restart.
     if (cloudinaryConfigured) {
       try {
         const result = await cloudinary.uploader.upload(req.file.path, {
@@ -39,7 +41,16 @@ export const uploadvideo = async (req, res) => {
         thumbnailUrl = result.secure_url.replace(/\.[^/.]+$/, ".jpg");
       } catch (cloudErr) {
         console.error("Cloudinary Upload Error:", cloudErr.message);
+        if (process.env.NODE_ENV === "production") {
+          return res.status(502).json({
+            message: "Video could not be stored in Cloudinary. Check the Cloudinary settings and try again.",
+          });
+        }
       }
+    } else if (process.env.NODE_ENV === "production") {
+      return res.status(503).json({
+        message: "Video uploads are unavailable until Cloudinary is configured.",
+      });
     }
 
     // Fallback duration if not fetched
