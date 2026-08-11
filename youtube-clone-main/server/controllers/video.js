@@ -54,7 +54,8 @@ export const uploadvideo = async (req, res) => {
       thumbnail: thumbnailUrl || `/uploads/${req.file.filename}`,
       filetype: req.file.mimetype,
       filesize: req.file.size,
-      videochanel: req.body.videochanel,
+      // Older accounts may not have a separately saved channel name yet.
+      videochanel: req.body.videochanel || "YourTube Channel",
       uploader: req.body.uploader,
       duration: duration,
     });

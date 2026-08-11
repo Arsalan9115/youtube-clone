@@ -43,7 +43,7 @@ const index = () => {
           <div className="px-4 pb-8">
             <VideoUploader
               channelId={id}
-              channelName={channel?.channelname}
+              channelName={channel?.channelname || channel?.name || "YourTube Channel"}
               onUploadSuccess={addUploadedVideo}
             />
           </div>
