@@ -110,20 +110,25 @@ export const sendLoginOtp = async (req, res) => {
       { new: true, upsert: true, maxTimeMS: 5000 }
     );
 
-    // Async Non-Blocking Delivery (Response hang nahi hone dega)
-    if (otpChannel === "email") {
-      sendOtpEmail({ email, name, otp, state }).catch((err) =>
-        console.error("Email background error:", err.message)
-      );
-    } else {
-      sendOtpSms({ mobileNumber, otp }).catch((err) =>
-        console.error("SMS background error:", err.message)
-      );
+    // Confirm that the provider accepted the message before claiming it was sent.
+    // Local development can still use its simulated delivery fallback, but a live
+    // deployment must have real SMTP/Twilio credentials configured.
+    const delivery =
+      otpChannel === "email"
+        ? await sendOtpEmail({ email, name, otp, state })
+        : await sendOtpSms({ mobileNumber, otp });
+
+    if (!delivery?.delivered) {
+      const provider = otpChannel === "email" ? "email (SMTP)" : "SMS (Twilio)";
+      return res.status(503).json({
+        deliveryChannel: otpChannel,
+        message: `OTP could not be delivered. The ${provider} service is not configured or rejected the request.`,
+      });
     }
 
     return res.status(200).json({
       deliveryChannel: otpChannel,
-      debugOtp: otp,
+      ...(process.env.OTP_DEBUG_MODE === "true" ? { debugOtp: otp } : {}),
       message:
         otpChannel === "email"
           ? "OTP sent to your email address."
@@ -132,10 +137,10 @@ export const sendLoginOtp = async (req, res) => {
     });
   } catch (error) {
     console.error("Send OTP Error:", error);
-    return res.status(200).json({
+    return res.status(500).json({
       deliveryChannel: otpChannel,
-      debugOtp: otp,
-      message: "OTP generated successfully.",
+      ...(process.env.OTP_DEBUG_MODE === "true" ? { debugOtp: otp } : {}),
+      message: "Unable to send OTP right now. Please try again.",
     });
   }
 };

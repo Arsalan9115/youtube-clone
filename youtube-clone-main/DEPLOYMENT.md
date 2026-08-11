@@ -20,6 +20,16 @@ Steps:
 4. Make sure `MONGO_URI` points to Atlas, not localhost.
 5. After deploy, note the backend URL, for example `https://yourtube-backend.onrender.com`.
 
+### OTP configuration (required on the live backend)
+
+Local OTP delivery is simulated when provider credentials are absent. This fallback is deliberately disabled in production, so configure one real provider in Render/Vercel's **backend** environment variables and redeploy:
+
+- For email OTP: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM`. For Gmail, use `GMAIL_USER` and a 16-character `GMAIL_APP_PASSWORD` instead of your normal Gmail password.
+- For SMS OTP: set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER`. A Twilio trial account can send only to verified destination numbers.
+- Set `NODE_ENV=production` and keep `OTP_DEBUG_MODE=false` so real OTPs are never exposed in the browser.
+
+The backend now returns a delivery error instead of incorrectly saying “OTP sent” when these settings are missing or rejected. Check the backend deployment logs for the exact SMTP/Twilio error if delivery still fails.
+
 ## 2. Frontend deployment
 
 Recommended: Vercel

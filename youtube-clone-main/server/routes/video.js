@@ -1,6 +1,8 @@
+import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { getallvideo, uploadvideo } from "../controllers/video.js";
 
 // Ensure 'uploads' directory exists on Render
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -22,4 +24,10 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB video file limit
 });
 
-export default upload;
+const routes = express.Router();
+
+// The client posts the video under the `video` form-data field.
+routes.post("/upload", upload.single("video"), uploadvideo);
+routes.get("/getall", getallvideo);
+
+export default routes;
