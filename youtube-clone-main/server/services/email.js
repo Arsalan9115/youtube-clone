@@ -4,6 +4,33 @@ const isDevelopmentFallbackEnabled = () =>
   process.env.NODE_ENV !== "production" &&
   process.env.DISABLE_DEV_DELIVERY_FALLBACK !== "true";
 
+const sendWithResend = async ({ html, subject, text, to }) => {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      // Resend allows this default sender for testing the account email. Set
+      // RESEND_FROM to a verified domain sender before sending to other users.
+      from: process.env.RESEND_FROM || "YourTube <onboarding@resend.dev>",
+      html,
+      subject,
+      text,
+      to: [to],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Resend delivery failed: ${await response.text()}`);
+  }
+
+  return true;
+};
+
 const getTransporter = () => {
   const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
@@ -124,6 +151,22 @@ export const sendPlanInvoiceEmail = async ({
 
 export const sendOtpEmail = async ({ email, name, otp, state }) => {
   try {
+    const subject = "YourTube Login OTP";
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2>YourTube OTP Verification</h2>
+        <p>Hi ${name || "User"},</p>
+        <p>You are signing in from ${state}. Because this region uses email verification, use the OTP below:</p>
+        <div style="margin: 20px 0; font-size: 28px; font-weight: 700; letter-spacing: 8px;">${otp}</div>
+        <p>This OTP expires in 10 minutes.</p>
+      </div>
+    `;
+    const text = `Hi ${name || "User"}, your YourTube login OTP is ${otp}. It expires in 10 minutes.`;
+
+    if (await sendWithResend({ html, subject, text, to: email })) {
+      return { delivered: true, skipped: false };
+    }
+
     const transporter = getTransporter();
 
     if (!transporter || !email) {
@@ -136,17 +179,9 @@ export const sendOtpEmail = async ({ email, name, otp, state }) => {
 
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.GMAIL_USER || process.env.SMTP_USER,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
-          <h2>YourTube OTP Verification</h2>
-          <p>Hi ${name || "User"},</p>
-          <p>You are signing in from ${state}. Because this region uses email verification, use the OTP below:</p>
-          <div style="margin: 20px 0; font-size: 28px; font-weight: 700; letter-spacing: 8px;">${otp}</div>
-          <p>This OTP expires in 10 minutes.</p>
-        </div>
-      `,
-      subject: "YourTube Login OTP",
-      text: `Hi ${name || "User"}, your YourTube login OTP is ${otp}. It expires in 10 minutes.`,
+      html,
+      subject,
+      text,
       to: email,
     });
 
