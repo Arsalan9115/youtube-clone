@@ -26,8 +26,26 @@ const upload = multer({
 
 const routes = express.Router();
 
-// The client posts the video under the `video` form-data field.
-routes.post("/upload", upload.single("video"), uploadvideo);
+// The client posts the video under the `video` form-data field. Handle Multer
+// errors here so a bad multipart request never becomes an unexplained 500.
+routes.post("/upload", (req, res, next) => {
+  console.log("Video upload request received");
+
+  upload.single("video")(req, res, (error) => {
+    if (error) {
+      console.error("Video upload middleware error:", error.message);
+      const status = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+      return res.status(status).json({
+        message:
+          error.code === "LIMIT_FILE_SIZE"
+            ? "Video must be 100MB or smaller."
+            : `Unable to process video upload: ${error.message}`,
+      });
+    }
+
+    return uploadvideo(req, res, next);
+  });
+});
 routes.get("/getall", getallvideo);
 
 export default routes;
