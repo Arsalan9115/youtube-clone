@@ -39,16 +39,15 @@ const getBrowserVideoDuration = (source: string) =>
     media.src = source;
   });
 
-// TypeScript Props Type Definition - Fixed by adding onDownload
 type VideoInfoProps = {
   video: any;
   isLocalVideo?: boolean;
-  onDownload?: () => void; // <-- 1. Type error fix
+  onDownload?: () => void;
 };
 
 const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) => {
-  const [likes, setlikes] = useState(video.Like || 0);
-  const [dislikes, setDislikes] = useState(video.Dislike || 0);
+  const [likes, setlikes] = useState(video?.Like || 0);
+  const [dislikes, setDislikes] = useState(video?.Dislike || 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -59,9 +58,9 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
   const router = useRouter();
 
   useEffect(() => {
-    setlikes(video.Like || 0);
-    setDislikes(video.Dislike || 0);
-    if (isLocalVideo && user?._id) {
+    setlikes(video?.Like || 0);
+    setDislikes(video?.Dislike || 0);
+    if (isLocalVideo && user?._id && video?._id) {
       const reactions = JSON.parse(localStorage.getItem("yourtube-local-reactions") || "{}");
       const reaction = reactions[`${user._id}:${video._id}`];
       setIsLiked(reaction === "like");
@@ -73,7 +72,7 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
   }, [video, isLocalVideo, user?._id]);
 
   useEffect(() => {
-    if (!user?._id) {
+    if (!user?._id || !video?._id) {
       setIsDownloaded(false);
       return;
     }
@@ -88,7 +87,7 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
       .get(`/downloads/video/${video._id}/status`)
       .then((response) => setIsDownloaded(Boolean(response.data?.downloaded)))
       .catch(() => setIsDownloaded(false));
-  }, [isLocalVideo, user?._id, video._id]);
+  }, [isLocalVideo, user?._id, video?._id]);
 
   const saveLocalVideo = (nextLikes: number, nextDislikes: number) => {
     const storedVideos = JSON.parse(localStorage.getItem("yourtube-videos") || "[]");
@@ -96,7 +95,7 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
       "yourtube-videos",
       JSON.stringify(
         storedVideos.map((item: any) =>
-          item._id === video._id
+          item._id === video?._id
             ? { ...item, Like: nextLikes, Dislike: nextDislikes }
             : item
         )
@@ -129,12 +128,11 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
 
   useEffect(() => {
     const handleviews = async () => {
+      if (!video?._id) return;
       const isLocalUpload =
-        typeof video?._id === "string" && !/^[a-f\d]{24}$/i.test(video._id);
+        typeof video._id === "string" && !/^[a-f\d]{24}$/i.test(video._id);
 
-      if (isLocalUpload) {
-        return;
-      }
+      if (isLocalUpload) return;
 
       if (user) {
         try {
@@ -145,7 +143,11 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
           return console.log(error);
         }
       } else {
-        return await axiosInstance.post(`/history/views/${video?._id}`);
+        try {
+          return await axiosInstance.post(`/history/views/${video._id}`);
+        } catch (err) {
+          console.log(err);
+        }
       }
     };
     handleviews();
@@ -156,7 +158,10 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
       handleLocalReaction("like");
       return;
     }
-    if (!user) return;
+    if (!user) {
+      toast.error("Please sign in to react.");
+      return;
+    }
     try {
       const res = await axiosInstance.post(`/like/${video._id}`, {
         userId: user?._id,
@@ -219,7 +224,10 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
       handleLocalReaction("dislike");
       return;
     }
-    if (!user) return;
+    if (!user) {
+      toast.error("Please sign in to react.");
+      return;
+    }
     try {
       const res = await axiosInstance.post(`/like/${video._id}`, {
         userId: user?._id,
@@ -243,7 +251,6 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
   };
 
   const handleDownload = async () => {
-    // Agar external onDownload passed hai, toh pehle use call karo
     if (onDownload) {
       onDownload();
       return;
@@ -341,103 +348,121 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{video.videotitle}</h1>
+    <div className="space-y-4 text-white">
+      {/* ⚡ Video Title Fix */}
+      <h1 className="text-xl font-bold text-white leading-tight">
+        {video?.videotitle || "Untitled Video"}
+      </h1>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap items-center gap-4">
-          <Avatar className="w-10 h-10">
-            <AvatarFallback>{video.videochanel?.[0] || "U"}</AvatarFallback>
+        <div className="flex flex-wrap items-center gap-3">
+          <Avatar className="w-10 h-10 border border-gray-700">
+            <AvatarFallback className="bg-purple-600 text-white font-bold">
+              {video?.videochanel?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-medium">{video.videochanel}</h3>
-            <p className="text-sm text-gray-600">1.2M subscribers</p>
+            <h3 className="font-semibold text-white leading-none">
+              {video?.videochanel || "Unknown Channel"}
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">1.2M subscribers</p>
           </div>
-          <Button className="ml-4">Subscribe</Button>
+          <Button className="ml-2 bg-white hover:bg-gray-200 text-black font-semibold rounded-full px-5 py-1.5 text-sm">
+            Subscribe
+          </Button>
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-full bg-slate-800 text-white">
+          {/* Likes & Dislikes Pill */}
+          <div className="flex items-center rounded-full bg-[#272727] text-white">
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-l-full text-white hover:bg-slate-700 hover:text-white"
+              className="rounded-l-full text-white hover:bg-[#3f3f3f] px-3 py-2"
               onClick={handleLike}
             >
               <ThumbsUp
-                className={`w-5 h-5 mr-2 ${
-                  isLiked ? "fill-black text-black" : ""
+                className={`w-4 h-4 mr-2 ${
+                  isLiked ? "fill-white text-white" : ""
                 }`}
               />
-              {likes.toLocaleString()}
+              <span className="text-sm font-medium">{likes.toLocaleString()}</span>
             </Button>
-            <div className="w-px h-6 bg-slate-600" />
+            <div className="w-px h-5 bg-gray-600" />
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-r-full text-white hover:bg-slate-700 hover:text-white"
+              className="rounded-r-full text-white hover:bg-[#3f3f3f] px-3 py-2"
               onClick={handleDislike}
             >
               <ThumbsDown
-                className={`w-5 h-5 mr-2 ${
-                  isDisliked ? "fill-black text-black" : ""
+                className={`w-4 h-4 mr-2 ${
+                  isDisliked ? "fill-white text-white" : ""
                 }`}
               />
-              {dislikes.toLocaleString()}
+              <span className="text-sm font-medium">{dislikes.toLocaleString()}</span>
             </Button>
           </div>
+
           <Button
             variant="ghost"
             size="sm"
-            className={`bg-slate-800 text-white hover:bg-slate-700 hover:text-white rounded-full ${
-              isWatchLater ? "text-primary" : ""
+            className={`bg-[#272727] text-white hover:bg-[#3f3f3f] rounded-full ${
+              isWatchLater ? "text-blue-400 font-semibold" : ""
             }`}
             onClick={handleWatchLater}
           >
-            <Clock className="w-5 h-5 mr-2" />
+            <Clock className="w-4 h-4 mr-2" />
             {isWatchLater ? "Saved" : "Watch Later"}
           </Button>
+
           <Button
             variant="ghost"
             size="sm"
-            className="bg-slate-800 text-white hover:bg-slate-700 hover:text-white rounded-full"
+            className="bg-[#272727] text-white hover:bg-[#3f3f3f] rounded-full"
           >
-            <Share className="w-5 h-5 mr-2" />
+            <Share className="w-4 h-4 mr-2" />
             Share
           </Button>
+
           <Button
             variant="ghost"
             size="sm"
-            className="bg-slate-800 text-white hover:bg-slate-700 hover:text-white rounded-full"
+            className="bg-[#272727] text-white hover:bg-[#3f3f3f] rounded-full"
             onClick={handleDownload}
             disabled={isDownloading || isDownloaded}
           >
-            <Download className="w-5 h-5 mr-2" />
+            <Download className="w-4 h-4 mr-2" />
             {isDownloaded ? "Downloaded" : isDownloading ? "Downloading..." : "Download"}
           </Button>
+
           <Button
             variant="ghost"
             size="icon"
-            className="bg-slate-800 text-white hover:bg-slate-700 hover:text-white rounded-full"
+            className="bg-[#272727] text-white hover:bg-[#3f3f3f] rounded-full w-9 h-9"
           >
-            <MoreHorizontal className="w-5 h-5" />
+            <MoreHorizontal className="w-4 h-4" />
           </Button>
         </div>
       </div>
-      <div className="rounded-lg bg-slate-800 p-4 text-white">
-        <div className="flex gap-4 text-sm font-medium mb-2">
-          <span>{(video.views || 0).toLocaleString()} views</span>
-          {video.createdAt ? <span>{formatDistanceToNow(new Date(video.createdAt))} ago</span> : null}
+
+      {/* Description Box */}
+      <div className="rounded-xl bg-[#272727] p-4 text-gray-200">
+        <div className="flex gap-3 text-sm font-semibold text-white mb-1">
+          <span>{(video?.views || 0).toLocaleString()} views</span>
+          {video?.createdAt ? (
+            <span>{formatDistanceToNow(new Date(video.createdAt))} ago</span>
+          ) : (
+            <span>recently</span>
+          )}
         </div>
-        <div className={`text-sm ${showFullDescription ? "" : "line-clamp-3"}`}>
-          <p>
-            Sample video description. This would contain the actual video
-            description from the database.
-          </p>
+        <div className={`text-sm text-gray-300 ${showFullDescription ? "" : "line-clamp-2"}`}>
+          <p>{video?.description || video?.videotitle || "No description provided."}</p>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="mt-2 p-0 h-auto font-medium"
+          className="mt-1 p-0 h-auto font-semibold text-white hover:text-gray-300 hover:bg-transparent"
           onClick={() => setShowFullDescription(!showFullDescription)}
         >
           {showFullDescription ? "Show less" : "Show more"}
