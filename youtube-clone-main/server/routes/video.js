@@ -1,11 +1,25 @@
-import express from "express";
-import { uploadvideo, getallvideo } from "../controllers/video.js";
-import upload from "../middleware/multer.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
-const routes = express.Router();
+// Ensure 'uploads' directory exists on Render
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-// Keep the legacy paths, but expose the names used by the frontend too.
-routes.post(["/upload", "/uploadvideo"], upload.single("video"), uploadvideo);
-routes.get(["/getall", "/getallvideo"], getallvideo);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
 
-export default routes;
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB video file limit
+});
+
+export default upload;
