@@ -52,18 +52,17 @@ export const requestDownload = async (req, res) => {
   try {
     const [user, video] = await Promise.all([
       users.findById(userId),
-      videos.findById(videoId), // ab ye videofiles collection me dhundega
+      videos.findById(videoId),
     ]);
 
-    if (!user ||!video) {
+    if (!user || !video) {
       return res.status(404).json({ success: false, message: "User or video not found." });
     }
 
     // ===== PLAN + DURATION LIMIT CHECK =====
     const plan = String(user.currentPlan || "free").toLowerCase();
     let videoDuration = Number(video.duration) || 0;
-    // Existing documents created before the upload fix may have duration 0.
-    // Never treat those as unlimited: calculate it now or reject the download.
+
     if (videoDuration <= 0) {
       try {
         videoDuration = await getStoredVideoDuration(video);
@@ -77,24 +76,24 @@ export const requestDownload = async (req, res) => {
     }
     const maxDuration = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
 
-    // 1. Duration limit check - Pop up ke liye 200 hi bhej rahe
-    if(videoDuration > maxDuration){
-        let neededPlan = 'bronze';
-        if(plan === 'bronze') neededPlan = 'silver';
-        else if(plan === 'silver') neededPlan = 'gold';
-        else if(plan === 'gold') neededPlan = 'gold'; // already max
+    // 1. Duration limit check
+    if (videoDuration > maxDuration) {
+      let neededPlan = 'bronze';
+      if (plan === 'bronze') neededPlan = 'silver';
+      else if (plan === 'silver') neededPlan = 'gold';
+      else if (plan === 'gold') neededPlan = 'gold';
 
-        return res.status(200).json({ 
-            success: false,
-            needUpgrade: true, // Frontend pop up ke liye
-            message: `Upgrade Required: Aapke ${plan} plan me max ${maxDuration/60} min allowed hai. Ye video ${Math.floor(videoDuration/60)} min ki hai.`,
-            code: "UPGRADE_NEEDED",
-            currentPlan: plan,
-            videoDuration: Math.floor(videoDuration/60),
-            maxAllowed: maxDuration / 60, // minutes me
-            neededPlan: neededPlan,
-            paymentRequired: true,
-        })
+      return res.status(200).json({ 
+        success: false,
+        needUpgrade: true,
+        message: `Upgrade Required: Aapke ${plan} plan me max ${maxDuration/60} min allowed hai. Ye video ${Math.floor(videoDuration/60)} min ki hai.`,
+        code: "UPGRADE_NEEDED",
+        currentPlan: plan,
+        videoDuration: Math.floor(videoDuration/60),
+        maxAllowed: maxDuration / 60,
+        neededPlan: neededPlan,
+        paymentRequired: true,
+      });
     }
 
     // 2. Free user daily 1 download limit
@@ -107,7 +106,7 @@ export const requestDownload = async (req, res) => {
       if (todayDownloads >= 1) {
         return res.status(200).json({
           success: false,
-          needUpgrade: true, // Frontend pop up ke liye
+          needUpgrade: true,
           message: "Free users can download only one video per day.",
           code: "DAILY_LIMIT",
           requiresPremium: true,
@@ -119,10 +118,16 @@ export const requestDownload = async (req, res) => {
 
     const existingDownload = await downloads.findOne({ userId, videoId });
     if (existingDownload) {
+      let downloadUrl = video.filepath;
+      if (!/^https?:\/\//i.test(downloadUrl)) {
+        downloadUrl = `${req.protocol}://${req.get("host")}/${normalizeFilePath(downloadUrl)}`;
+      }
+
       return res.status(200).json({
         success: true,
         alreadyDownloaded: true,
         download: existingDownload,
+        downloadUrl: downloadUrl,
         message: "This video has already been downloaded.",
       });
     }
@@ -134,12 +139,16 @@ export const requestDownload = async (req, res) => {
       downloadedAt: new Date()
     });
 
+    // ⚡ FIX: Check if filepath is full HTTP/HTTPS URL (Cloudinary)
+    let finalDownloadUrl = video.filepath;
+    if (!/^https?:\/\//i.test(finalDownloadUrl)) {
+      finalDownloadUrl = `${req.protocol}://${req.get("host")}/${normalizeFilePath(finalDownloadUrl)}`;
+    }
+
     return res.status(200).json({
       success: true,
       download: downloadEntry,
-      downloadUrl: `${req.protocol}://${req.get("host")}/${normalizeFilePath(
-        video.filepath
-      )}`,
+      downloadUrl: finalDownloadUrl,
       currentPlan: plan,
       message: "Download is ready.",
     });
@@ -175,9 +184,9 @@ export const getUserDownloads = async (req, res) => {
 
   try {
     const downloadList = await downloads
-     .find({ userId })
-     .populate("videoId")
-     .sort({ downloadedAt: -1 });
+      .find({ userId })
+      .populate("videoId")
+      .sort({ downloadedAt: -1 });
 
     const todayDownloads = await downloads.countDocuments({
       downloadedAt: { $gte: startOfToday() },
@@ -191,9 +200,9 @@ export const getUserDownloads = async (req, res) => {
       success: true,
       downloads: downloadList,
       todayDownloads,
-      canDownloadToday: plan!== 'free' || todayDownloads < 1,
+      canDownloadToday: plan !== 'free' || todayDownloads < 1,
       currentPlan: plan,
-      isPremium: plan!== 'free',
+      isPremium: plan !== 'free',
     });
   } catch (error) {
     console.error(error);

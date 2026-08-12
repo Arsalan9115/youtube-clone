@@ -81,6 +81,7 @@ export default function CallStudio() {
   const [callRole, setCallRole] = useState<CallRole>("idle");
   const [isBusy, setIsBusy] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isMobileSyncActive, setIsMobileSyncActive] = useState(false); // ⚡ NEW: Mobile Sync State
   const [isRecording, setIsRecording] = useState(false);
   const [screenShareHint, setScreenShareHint] = useState(
     "Choose the YouTube browser tab in the system picker when you want to watch together."
@@ -446,6 +447,7 @@ export default function CallStudio() {
     }
   };
 
+  // ⚡ UPDATED: Screen Share with Mobile Fallback
   const startScreenShare = async () => {
     if (!peerConnectionRef.current || !videoSenderRef.current) {
       setStatus("Start or join a call before sharing your screen.");
@@ -453,50 +455,71 @@ export default function CallStudio() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        audio: true,
-        video: {
-          frameRate: 30,
-        },
-      });
+      // Desktop API Check
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function") {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          audio: true,
+          video: { frameRate: 30 },
+        });
 
-      const screenTrack = stream.getVideoTracks()[0];
-      if (!screenTrack) {
-        setStatus("Screen sharing started without a video track, so nothing was sent.");
-        stopStream(stream);
-        return;
+        const screenTrack = stream.getVideoTracks()[0];
+        if (!screenTrack) {
+          setStatus("Screen sharing started without a video track, so nothing was sent.");
+          stopStream(stream);
+          return;
+        }
+
+        if (!/youtube/i.test(screenTrack.label)) {
+          stopStream(stream);
+          setStatus("Please select a YouTube browser tab in the share picker.");
+          return;
+        }
+
+        displayStreamRef.current = stream;
+        attachStream(screenPreviewRef.current, stream, true);
+        screenTrack.onended = () => {
+          void stopScreenShare();
+        };
+
+        await videoSenderRef.current.replaceTrack(screenTrack);
+        setIsScreenSharing(true);
+        setIsMobileSyncActive(false);
+        setScreenShareHint(
+          stream.getAudioTracks().length > 0
+            ? "You are sharing tab visuals and audio. Great for a YouTube watch-along."
+            : "Screen video is live. If you want YouTube audio too, choose a browser tab and enable share audio."
+        );
+
+        await replaceOutgoingAudioTrack(true);
+        setStatus("Screen share is live. Pick the YouTube tab for the smoothest shared viewing.");
+      } else {
+        throw new Error("MobileBrowserFallback"); // Force fallback for mobile
       }
-
-      if (!/youtube/i.test(screenTrack.label)) {
-        stopStream(stream);
-        setStatus("Please select a YouTube browser tab in the share picker.");
-        return;
-      }
-
-      displayStreamRef.current = stream;
-      attachStream(screenPreviewRef.current, stream, true);
-      screenTrack.onended = () => {
-        void stopScreenShare();
-      };
-
-      await videoSenderRef.current.replaceTrack(screenTrack);
-      setIsScreenSharing(true);
-      setScreenShareHint(
-        stream.getAudioTracks().length > 0
-          ? "You are sharing tab visuals and audio. Great for a YouTube watch-along."
-          : "Screen video is live. If you want YouTube audio too, choose a browser tab and enable share audio."
-      );
-
-      await replaceOutgoingAudioTrack(true);
-      setStatus("Screen share is live. Pick the YouTube tab for the smoothest shared viewing.");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setStatus("Screen sharing was cancelled or blocked by the browser.");
+      if (error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError") {
+        setStatus("Screen sharing was cancelled or blocked by the browser.");
+      } else {
+        // Mobile Fallback Triggered!
+        setIsMobileSyncActive(true);
+        setIsScreenSharing(true);
+        setStatus("Mobile detected: Synchronized YouTube Share Mode Active!");
+        setScreenShareHint("Embedded YouTube player is active for mobile viewers.");
+      }
     }
   };
 
+  // ⚡ UPDATED: Stop Screen Share Handler
   const stopScreenShare = async () => {
     if (!isScreenSharing) {
+      return;
+    }
+
+    if (isMobileSyncActive) {
+      setIsMobileSyncActive(false);
+      setIsScreenSharing(false);
+      setStatus("Returned from mobile screen share to your camera feed.");
+      setScreenShareHint("Choose the YouTube browser tab in the system picker when you want to watch together.");
       return;
     }
 
@@ -579,7 +602,7 @@ export default function CallStudio() {
           return false;
         };
 
-        if (isScreenSharing) {
+        if (isScreenSharing && !isMobileSyncActive) {
           drawVideo(screenVideo, 0, 0, canvas.width, canvas.height);
           drawVideo(remoteVideo, 36, 36, 360, 202);
           drawVideo(localVideo, canvas.width - 276, canvas.height - 176, 240, 140);
@@ -711,6 +734,7 @@ export default function CallStudio() {
     setActiveRoomId("");
     setCallRole("idle");
     setIsScreenSharing(false);
+    setIsMobileSyncActive(false);
     setRoomInput("");
     setIsBusy(false);
 
@@ -888,7 +912,7 @@ export default function CallStudio() {
                   />
                 </div>
 
-                <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900">
+                <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900 relative">
                   <div className="flex items-center justify-between px-4 py-3 text-xs uppercase tracking-[0.18em] text-slate-400">
                     <span>Shared Screen</span>
                     {isScreenSharing ? (
@@ -897,13 +921,26 @@ export default function CallStudio() {
                       <VideoOff className="h-4 w-4 text-slate-500" />
                     )}
                   </div>
-                  <video
-                    ref={screenPreviewRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="aspect-video w-full bg-slate-900 object-cover"
-                  />
+                  {/* ⚡ UPDATED: Mobile Iframe Fallback Layout */}
+                  {isMobileSyncActive ? (
+                    <div className="aspect-video w-full flex flex-col bg-black relative">
+                      <iframe
+                        className="w-full h-full"
+                        src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
+                        title="Shared YouTube Stream"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <video
+                      ref={screenPreviewRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="aspect-video w-full bg-slate-900 object-cover"
+                    />
+                  )}
                 </div>
               </div>
             </div>

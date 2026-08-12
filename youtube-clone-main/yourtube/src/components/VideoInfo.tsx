@@ -57,6 +57,21 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
   const [isDownloaded, setIsDownloaded] = useState(false);
   const router = useRouter();
 
+  // ⚡ Helper function for cross-platform (Mobile + Desktop) file trigger
+  const triggerMobileSafeDownload = (url: string, filename: string) => {
+    try {
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
   useEffect(() => {
     setlikes(video?.Like || 0);
     setDislikes(video?.Dislike || 0);
@@ -295,12 +310,7 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
           ])
         );
         setIsDownloaded(true);
-        const link = document.createElement("a");
-        link.href = video.filepath;
-        link.download = `${video.videotitle || "video"}.mp4`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        triggerMobileSafeDownload(video.filepath, `${video.videotitle || "video"}.mp4`);
         toast.success("Video download started.");
         return;
       }
@@ -323,12 +333,7 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
         return;
       }
 
-      const link = document.createElement("a");
-      link.href = response.data.downloadUrl;
-      link.download = `${video.videotitle || "video"}.mp4`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      triggerMobileSafeDownload(response.data.downloadUrl, `${video.videotitle || "video"}.mp4`);
 
       setIsDownloaded(true);
       toast.success("Video download started.");
@@ -349,7 +354,7 @@ const VideoInfo = ({ video, isLocalVideo = false, onDownload }: VideoInfoProps) 
 
   return (
     <div className="space-y-4 text-white">
-      {/* ⚡ Video Title Fix */}
+      {/* ⚡ Video Title */}
       <h1 className="text-xl font-bold text-white leading-tight">
         {video?.videotitle || "Untitled Video"}
       </h1>
