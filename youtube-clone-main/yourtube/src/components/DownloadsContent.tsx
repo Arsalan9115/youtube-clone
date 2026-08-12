@@ -94,7 +94,7 @@ export default function DownloadsContent() {
     toast.dismiss();
 
     try {
-      // 1. Order Creation
+      // 1. Backend Order Generation
       const orderResponse = await axiosInstance.post("/payments/plans/order", {
         planCode,
         userId: user._id,
@@ -102,7 +102,7 @@ export default function DownloadsContent() {
 
       const { amount, checkoutMode, order, planName, razorpayKeyId } = orderResponse.data;
 
-      // 2. Development mode fallback handling
+      // 2. Development Mode Handling
       if (checkoutMode === "development" || !razorpayKeyId) {
         const verifyResponse = await axiosInstance.post("/payments/plans/verify", {
           userId: user._id,
@@ -118,14 +118,14 @@ export default function DownloadsContent() {
         return;
       }
 
-      // 3. Load Razorpay Script
+      // 3. Load Razorpay Checkout Script
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         toast.error("Razorpay checkout script failed to load.");
         return;
       }
 
-      // 4. Razorpay Modal Options with Failure Recovery
+      // 4. Standard Razorpay Modal Options
       const razorpay = new window.Razorpay({
         key: razorpayKeyId,
         amount: amount,
@@ -163,7 +163,6 @@ export default function DownloadsContent() {
           contact: user.mobileNumber || "9876543210",
         },
         notes: {
-          address: "India",
           planCode: planCode,
         },
         theme: {
@@ -171,24 +170,8 @@ export default function DownloadsContent() {
         },
       });
 
-      // ⚡ CARD FAIL SAFE HANDLER: If card is rejected by Razorpay test restrictions
-      razorpay.on("payment.failed", async (response: any) => {
-        toast.info("Verifying card test transaction...");
-        try {
-          const verifyResponse = await axiosInstance.post("/payments/plans/verify", {
-            userId: user._id,
-            razorpay_order_id: order.id,
-            razorpay_payment_id: `card_test_${Date.now()}`,
-          });
-
-          setIsPremium(true);
-          setCurrentPlan(planCode);
-          await refreshUser?.(user._id);
-          await loadDownloads();
-          toast.success(`${planName} plan activated successfully!`);
-        } catch (e) {
-          toast.error("Unable to activate plan.");
-        }
+      razorpay.on("payment.failed", (response: any) => {
+        toast.error(response?.error?.description || "Payment failed.");
       });
 
       razorpay.open();
