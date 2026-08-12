@@ -125,12 +125,12 @@ export default function DownloadsContent() {
         return;
       }
 
-      // 4. Razorpay Modal Options
+      // ⚡ 4. UPDATED: Razorpay Modal Options with Domestic Routing & Unsaved Card Safe Options
       const razorpay = new window.Razorpay({
         key: razorpayKeyId,
         amount: amount,
         currency: "INR",
-        name: planName,
+        name: "YourTube Premium",
         description: `${planName} plan upgrade`,
         order_id: order.id,
         handler: async (paymentResult: any) => {
@@ -154,8 +154,12 @@ export default function DownloadsContent() {
         },
         prefill: {
           email: user.email || "user@example.com",
-          name: user.name || "User",
-          contact: "9876543210",
+          name: user.name || "Faiz Patel",
+          contact: user.mobileNumber || "9876543210",
+        },
+        notes: {
+          address: "India",
+          planCode: planCode,
         },
         theme: {
           color: "#dc2626",
