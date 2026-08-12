@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { useUser } from "@/lib/AuthContext";
 import { PLAN_CONFIG, type PlanCode } from "@/lib/plans";
+import axiosInstance from "@/lib/axiosinstance";
 import { Button } from "./ui/button";
 
 type GestureZone = "left" | "center" | "right";
@@ -37,16 +38,39 @@ export default function VideoPlayer({
   const { user } = useUser();
   const [isLocked, setIsLocked] = useState(false);
   const [gestureMessage, setGestureMessage] = useState("");
+  const [livePlan, setLivePlan] = useState<string>("free");
+  
   const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapStateRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({
     count: 0,
     timer: null,
   });
 
-  // ⚡ FIX 1: Normalize Plan string to lowercase
-  const currentPlan = (
-    String(user?.currentPlan || (user?.isPremium ? "gold" : "free")).toLowerCase()
-  ) as PlanCode;
+  // ⚡ FIX: Sync Live Plan from DB / User context directly
+  useEffect(() => {
+    let activeUserPlan = String(
+      user?.currentPlan || (user?.isPremium ? "gold" : "free")
+    ).toLowerCase();
+
+    setLivePlan(activeUserPlan);
+
+    // Fetch fresh plan directly from backend on mount
+    if (user?._id) {
+      axiosInstance
+        .get("/auth/me")
+        .then((res) => {
+          const freshPlan =
+            res.data?.user?.currentPlan ||
+            (res.data?.user?.isPremium ? "gold" : "free");
+          if (freshPlan) {
+            setLivePlan(String(freshPlan).toLowerCase());
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [user, video?._id]);
+
+  const currentPlan = (livePlan || "free") as PlanCode;
 
   const activePlan = useMemo(
     () => PLAN_CONFIG[currentPlan] || PLAN_CONFIG.free,
@@ -87,7 +111,6 @@ export default function VideoPlayer({
       return;
     }
 
-    // ⚡ FIX 2: Strict Tiered Watch Time Limits Check
     let watchLimitSeconds: number | null = null;
 
     if (currentPlan === "free") {

@@ -81,7 +81,7 @@ export default function CallStudio() {
   const [callRole, setCallRole] = useState<CallRole>("idle");
   const [isBusy, setIsBusy] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isMobileSyncActive, setIsMobileSyncActive] = useState(false); // ⚡ NEW: Mobile Sync State
+  const [isMobileSyncActive, setIsMobileSyncActive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [screenShareHint, setScreenShareHint] = useState(
     "Choose the YouTube browser tab in the system picker when you want to watch together."
@@ -447,7 +447,6 @@ export default function CallStudio() {
     }
   };
 
-  // ⚡ UPDATED: Screen Share with Mobile Fallback
   const startScreenShare = async () => {
     if (!peerConnectionRef.current || !videoSenderRef.current) {
       setStatus("Start or join a call before sharing your screen.");
@@ -455,7 +454,6 @@ export default function CallStudio() {
     }
 
     try {
-      // Desktop API Check
       if (navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function") {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           audio: true,
@@ -493,14 +491,13 @@ export default function CallStudio() {
         await replaceOutgoingAudioTrack(true);
         setStatus("Screen share is live. Pick the YouTube tab for the smoothest shared viewing.");
       } else {
-        throw new Error("MobileBrowserFallback"); // Force fallback for mobile
+        throw new Error("MobileBrowserFallback");
       }
     } catch (error: any) {
       console.error(error);
       if (error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError") {
         setStatus("Screen sharing was cancelled or blocked by the browser.");
       } else {
-        // Mobile Fallback Triggered!
         setIsMobileSyncActive(true);
         setIsScreenSharing(true);
         setStatus("Mobile detected: Synchronized YouTube Share Mode Active!");
@@ -509,7 +506,6 @@ export default function CallStudio() {
     }
   };
 
-  // ⚡ UPDATED: Stop Screen Share Handler
   const stopScreenShare = async () => {
     if (!isScreenSharing) {
       return;
@@ -921,12 +917,12 @@ export default function CallStudio() {
                       <VideoOff className="h-4 w-4 text-slate-500" />
                     )}
                   </div>
-                  {/* ⚡ UPDATED: Mobile Iframe Fallback Layout */}
+                  {/* ⚡ FIXED: Universal Open-Access YouTube Stream URL */}
                   {isMobileSyncActive ? (
                     <div className="aspect-video w-full flex flex-col bg-black relative">
                       <iframe
-                        className="w-full h-full"
-                        src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
+                        className="w-full h-full border-0"
+                        src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1"
                         title="Shared YouTube Stream"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
