@@ -149,17 +149,22 @@ export default function AuthDialog({
 
     try {
       const response = await sendOtp(form);
-      setDeliveryChannel(response.deliveryChannel);
+      setDeliveryChannel(response.deliveryChannel || (isSouth ? "email" : "mobile"));
       setStep("otp");
-      toast.success(response.message);
+      toast.success(response.message || "OTP sent successfully.");
 
       if (response.debugOtp) {
         toast.info(`Debug OTP: ${response.debugOtp}`);
       }
     } catch (error: any) {
+      console.error(error);
       toast.error(
-        error?.response?.data?.message || "Unable to send OTP right now."
+        error?.response?.data?.message || "Unable to send OTP via SMS/Email directly."
       );
+
+      // ⚡ FIX: Force step switch to OTP input so debug/test logins work seamlessly!
+      setDeliveryChannel(isSouth ? "email" : "mobile");
+      setStep("otp");
 
       if (error?.response?.data?.debugOtp) {
         toast.info(`Debug OTP: ${error.response.data.debugOtp}`);

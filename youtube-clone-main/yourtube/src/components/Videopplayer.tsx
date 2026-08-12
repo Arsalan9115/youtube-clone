@@ -43,7 +43,11 @@ export default function VideoPlayer({
     timer: null,
   });
 
-  const currentPlan = ((user?.currentPlan as PlanCode) || "free") as PlanCode;
+  // ⚡ FIX 1: Normalize Plan string to lowercase
+  const currentPlan = (
+    String(user?.currentPlan || (user?.isPremium ? "gold" : "free")).toLowerCase()
+  ) as PlanCode;
+
   const activePlan = useMemo(
     () => PLAN_CONFIG[currentPlan] || PLAN_CONFIG.free,
     [currentPlan]
@@ -51,7 +55,7 @@ export default function VideoPlayer({
 
   useEffect(() => {
     setIsLocked(false);
-  }, [video._id]);
+  }, [video?._id, currentPlan]);
 
   useEffect(() => {
     return () => {
@@ -79,11 +83,22 @@ export default function VideoPlayer({
 
   const handleTimeUpdate = () => {
     const videoElement = videoRef.current;
-    if (!videoElement || !activePlan.watchLimitLabel) {
+    if (!videoElement) {
       return;
     }
 
-    const watchLimitSeconds = user?.watchLimitSeconds ?? (currentPlan === "gold" ? null : currentPlan === "silver" ? 600 : currentPlan === "bronze" ? 420 : 300);
+    // ⚡ FIX 2: Strict Tiered Watch Time Limits Check
+    let watchLimitSeconds: number | null = null;
+
+    if (currentPlan === "free") {
+      watchLimitSeconds = 5 * 60; // 5 min (300s)
+    } else if (currentPlan === "bronze") {
+      watchLimitSeconds = 7 * 60; // 7 min (420s)
+    } else if (currentPlan === "silver") {
+      watchLimitSeconds = 10 * 60; // 10 min (600s)
+    } else if (currentPlan === "gold") {
+      watchLimitSeconds = null; // Unlimited
+    }
 
     if (watchLimitSeconds && videoElement.currentTime >= watchLimitSeconds) {
       videoElement.pause();
@@ -208,8 +223,8 @@ export default function VideoPlayer({
         Your browser does not support the video tag.
       </video>
 
-      <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
-        {activePlan.displayName} plan | {activePlan.watchLimitLabel}
+      <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white capitalize">
+        {currentPlan} plan | {currentPlan === "gold" ? "Unlimited" : currentPlan === "silver" ? "10 mins" : currentPlan === "bronze" ? "7 mins" : "5 mins"}
       </div>
 
       {!isLocked ? (
@@ -248,7 +263,7 @@ export default function VideoPlayer({
       </div>
 
       {isLocked ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/86 p-6 text-white">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/86 p-6 text-white z-50">
           <div className="max-w-md rounded-[28px] border border-white/10 bg-white/10 p-6 text-center backdrop-blur">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/20 text-red-200">
               <Lock className="h-7 w-7" />
@@ -257,11 +272,11 @@ export default function VideoPlayer({
               Watch limit reached
             </h3>
             <p className="mt-3 text-sm leading-6 text-slate-200">
-              Your {activePlan.displayName} plan allows {activePlan.watchLimitLabel.toLowerCase()} per video. Upgrade to Bronze, Silver, or Gold to continue watching longer.
+              Your {currentPlan.toUpperCase()} plan watch limit is over. Upgrade to Silver or Gold to continue watching longer.
             </p>
             <Button asChild className="mt-5 bg-red-600 hover:bg-red-700">
               <Link href="/downloads">
-                <Crown className="h-4 w-4" />
+                <Crown className="h-4 w-4 mr-2" />
                 Upgrade Plan
               </Link>
             </Button>
