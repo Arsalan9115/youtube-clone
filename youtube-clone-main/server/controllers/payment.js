@@ -53,11 +53,12 @@ export const createPlanOrder = async (req, res) => {
       });
     }
 
-    // Force currency to "INR" to prevent Razorpay International Card Block
     const targetCurrency = "INR";
 
-    // ⚡ FIX: Convert Rupees to Paise for Razorpay API (e.g., ₹100 = 10000 Paise)
-    const amountInPaise = Math.round(Number(selectedPlan.amount) * 100);
+    // ⚡ FIX: Check if plan.amount is already in paise or rupees
+    const rawAmount = Number(selectedPlan.amount);
+    const amountInPaise = rawAmount < 1000 ? rawAmount * 100 : rawAmount;
+    const actualRupees = amountInPaise / 100;
 
     const order = razorpay
       ? await razorpay.orders.create({
@@ -83,7 +84,7 @@ export const createPlanOrder = async (req, res) => {
         };
 
     await payments.create({
-      amount: selectedPlan.amount,
+      amount: actualRupees,
       currency: targetCurrency,
       invoiceNumber: buildInvoiceNumber(),
       planCode,
@@ -98,7 +99,7 @@ export const createPlanOrder = async (req, res) => {
       order,
       razorpayKeyId: process.env.RAZORPAY_KEY_ID,
       checkoutMode: razorpay ? "razorpay" : "development",
-      amount: selectedPlan.amount,
+      amount: actualRupees,
       currency: targetCurrency,
       planCode,
       planName: selectedPlan.displayName,
